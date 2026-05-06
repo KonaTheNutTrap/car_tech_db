@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/service_order_print.dart';
 
 class JobsScreen extends StatefulWidget {
   const JobsScreen({super.key});
@@ -345,6 +346,13 @@ class _JobsScreenState extends State<JobsScreen>
                       label: const Text('Invoice'),
                       style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
                       onPressed: () => _generateInvoice(job),
+                    ),
+                  if (job.status == 'Completed')
+                    TextButton.icon(
+                      icon: const Icon(Icons.print, size: 16),
+                      label: const Text('Print'),
+                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                      onPressed: () => ServiceOrderPrint.printJob(job, context),
                     ),
                   IconButton(
                     icon: const Icon(Icons.edit, size: 18),

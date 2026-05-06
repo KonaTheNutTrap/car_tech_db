@@ -435,6 +435,18 @@ class DatabaseHelper {
     return result.map((e) => JobPart.fromMap(e)).toList();
   }
 
+  /// Get job parts with part names from the parts table
+  Future<List<Map<String, dynamic>>> getJobPartsWithNames(int jobId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT jp.quantity, jp.unit_price, p.name
+      FROM job_parts jp
+      INNER JOIN parts p ON jp.part_id = p.id
+      WHERE jp.job_id = ?
+    ''', [jobId]);
+    return result;
+  }
+
   Future<int> insertJobPart(JobPart jp) async {
     final db = await database;
     return await db.insert('job_parts', jp.toMap());
