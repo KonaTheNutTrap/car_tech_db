@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sort_dropdown.dart';
 
 class InvoicesScreen extends StatefulWidget {
   const InvoicesScreen({super.key});
@@ -13,9 +14,12 @@ class InvoicesScreen extends StatefulWidget {
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
   List<Invoice> _invoices = [];
+  List<Invoice> _allInvoices = [];
   List<Job> _jobs = [];
   List<Customer> _customers = [];
   bool _loading = true;
+  final _searchCtrl = TextEditingController();
+  String _sortOption = 'newest';
 
   @override
   void initState() {
@@ -23,19 +27,62 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load([String? search]) async {
     setState(() => _loading = true);
     final db = DatabaseHelper.instance;
     final invoices = await db.getInvoices();
     final jobs = await db.getJobs();
     final customers = await db.getCustomers();
     if (!mounted) return;
-    setState(() {
-      _invoices = invoices;
-      _jobs = jobs;
-      _customers = customers;
-      _loading = false;
-    });
+    _allInvoices = invoices;
+    _jobs = jobs;
+    _customers = customers;
+    _applySearchAndSort();
+    _loading = false;
+  }
+
+  void _applySearchAndSort() {
+    var list = List<Invoice>.from(_allInvoices);
+    final search = _searchCtrl.text.toLowerCase().trim();
+
+    // Apply search filter
+    if (search.isNotEmpty) {
+      list = list.where((inv) {
+        final invNum = inv.invoiceNumber.toLowerCase();
+        final custName = _custName(inv.jobId).toLowerCase();
+        final jobDesc = _jobDesc(inv.jobId).toLowerCase();
+        return invNum.contains(search) ||
+            custName.contains(search) ||
+            jobDesc.contains(search);
+      }).toList();
+    }
+
+    // Apply sort
+    switch (_sortOption) {
+      case 'fifo':
+        list.sort((a, b) => a.id!.compareTo(b.id!));
+        break;
+      case 'newest':
+        list.sort((a, b) => b.id!.compareTo(a.id!));
+        break;
+      case 'amount_asc':
+        list.sort((a, b) => a.totalAmount.compareTo(b.totalAmount));
+        break;
+      case 'amount_desc':
+        list.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+        break;
+      case 'status':
+        list.sort((a, b) => a.paymentStatus.compareTo(b.paymentStatus));
+        break;
+    }
+
+    setState(() => _invoices = list);
   }
 
   String _custName(int jobId) {
@@ -149,6 +196,47 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                 const SizedBox(width: 12),
                 _summaryTile(
                     'Invoices', '${_invoices.length}', AppTheme.primary),
+              ],
+            ),
+          ),
+          // Search & Sort row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search by invoice #, customer, or job...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _load();
+                              })
+                          : null,
+                    ),
+                    onChanged: (v) => _load(v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SortDropdown(
+                  currentValue: _sortOption,
+                  options: const [
+                    SortOption('Newest First', 'newest'),
+                    SortOption('FIFO (Oldest)', 'fifo'),
+                    SortOption('Amount (Low→High)', 'amount_asc'),
+                    SortOption('Amount (High→Low)', 'amount_desc'),
+                    SortOption('Payment Status', 'status'),
+                  ],
+                  onChanged: (v) {
+                    setState(() => _sortOption = v);
+                    _applySearchAndSort();
+                  },
+                ),
               ],
             ),
           ),

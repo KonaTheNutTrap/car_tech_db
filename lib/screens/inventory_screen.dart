@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sort_dropdown.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -12,8 +13,10 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   List<Part> _parts = [];
+  List<Part> _allParts = [];
   bool _loading = true;
   final _searchCtrl = TextEditingController();
+  String _sortOption = 'fifo';
 
   @override
   void initState() {
@@ -21,14 +24,51 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _load();
   }
 
+  void _sortParts() {
+    final list = List<Part>.from(_allParts);
+    switch (_sortOption) {
+      case 'fifo':
+        list.sort((a, b) => a.id!.compareTo(b.id!));
+        break;
+      case 'newest':
+        list.sort((a, b) => b.id!.compareTo(a.id!));
+        break;
+      case 'name_asc':
+        list.sort((a, b) => a.name.compareTo(b.name));
+        break;
+      case 'name_desc':
+        list.sort((a, b) => b.name.compareTo(a.name));
+        break;
+      case 'qty_asc':
+        list.sort((a, b) => a.quantity.compareTo(b.quantity));
+        break;
+      case 'qty_desc':
+        list.sort((a, b) => b.quantity.compareTo(a.quantity));
+        break;
+      case 'price_asc':
+        list.sort((a, b) => a.unitPrice.compareTo(b.unitPrice));
+        break;
+      case 'price_desc':
+        list.sort((a, b) => b.unitPrice.compareTo(a.unitPrice));
+        break;
+      case 'cat_asc':
+        list.sort((a, b) {
+          final ca = a.category ?? '';
+          final cb = b.category ?? '';
+          return ca.compareTo(cb);
+        });
+        break;
+    }
+    setState(() => _parts = list);
+  }
+
   Future<void> _load([String? search]) async {
     setState(() => _loading = true);
     final list = await DatabaseHelper.instance.getParts(search: search);
     if (!mounted) return;
-    setState(() {
-      _parts = list;
-      _loading = false;
-    });
+    _allParts = list;
+    _sortParts();
+    _loading = false;
   }
 
   Future<void> _showForm([Part? existing]) async {
@@ -195,22 +235,47 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: 'Search parts...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _load();
-                        })
-                    : null,
-              ),
-              onChanged: (v) => _load(v),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search parts...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _load();
+                              })
+                          : null,
+                    ),
+                    onChanged: (v) => _load(v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SortDropdown(
+                  currentValue: _sortOption,
+                  options: const [
+                    SortOption('FIFO (Oldest)', 'fifo'),
+                    SortOption('Newest First', 'newest'),
+                    SortOption('Name (A-Z)', 'name_asc'),
+                    SortOption('Name (Z-A)', 'name_desc'),
+                    SortOption('Qty (Low→High)', 'qty_asc'),
+                    SortOption('Qty (High→Low)', 'qty_desc'),
+                    SortOption('Price (Low→High)', 'price_asc'),
+                    SortOption('Price (High→Low)', 'price_desc'),
+                    SortOption('Category (A-Z)', 'cat_asc'),
+                  ],
+                  onChanged: (v) {
+                    setState(() => _sortOption = v);
+                    _sortParts();
+                  },
+                ),
+              ],
             ),
           ),
           Expanded(

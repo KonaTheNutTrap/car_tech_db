@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sort_dropdown.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -12,7 +13,10 @@ class UsersScreen extends StatefulWidget {
 
 class _UsersScreenState extends State<UsersScreen> {
   List<User> _users = [];
+  List<User> _allUsers = [];
   bool _loading = true;
+  final _searchCtrl = TextEditingController();
+  String _sortOption = 'name_asc';
 
   @override
   void initState() {
@@ -20,14 +24,57 @@ class _UsersScreenState extends State<UsersScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load([String? search]) async {
     setState(() => _loading = true);
     final list = await DatabaseHelper.instance.getUsers();
     if (!mounted) return;
-    setState(() {
-      _users = list;
-      _loading = false;
-    });
+    _allUsers = list;
+    _applySearchAndSort();
+    _loading = false;
+  }
+
+  void _applySearchAndSort() {
+    var list = List<User>.from(_allUsers);
+    final search = _searchCtrl.text.toLowerCase().trim();
+
+    // Apply search filter
+    if (search.isNotEmpty) {
+      list = list.where((u) {
+        final name = u.fullName.toLowerCase();
+        final username = u.username.toLowerCase();
+        final role = u.role.toLowerCase();
+        return name.contains(search) ||
+            username.contains(search) ||
+            role.contains(search);
+      }).toList();
+    }
+
+    // Apply sort
+    switch (_sortOption) {
+      case 'fifo':
+        list.sort((a, b) => a.id!.compareTo(b.id!));
+        break;
+      case 'newest':
+        list.sort((a, b) => b.id!.compareTo(a.id!));
+        break;
+      case 'name_asc':
+        list.sort((a, b) => a.fullName.compareTo(b.fullName));
+        break;
+      case 'name_desc':
+        list.sort((a, b) => b.fullName.compareTo(a.fullName));
+        break;
+      case 'role':
+        list.sort((a, b) => a.role.compareTo(b.role));
+        break;
+    }
+
+    setState(() => _users = list);
   }
 
   Future<void> _showForm([User? existing]) async {
@@ -150,13 +197,61 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('User Management')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _users.length,
-              itemBuilder: (_, i) => _userCard(_users[i]),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, username, or role...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _load();
+                              })
+                          : null,
+                    ),
+                    onChanged: (v) => _load(v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SortDropdown(
+                  currentValue: _sortOption,
+                  options: const [
+                    SortOption('Name (A-Z)', 'name_asc'),
+                    SortOption('Name (Z-A)', 'name_desc'),
+                    SortOption('FIFO (Oldest)', 'fifo'),
+                    SortOption('Newest First', 'newest'),
+                    SortOption('Role', 'role'),
+                  ],
+                  onChanged: (v) {
+                    setState(() => _sortOption = v);
+                    _applySearchAndSort();
+                  },
+                ),
+              ],
             ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _users.isEmpty
+                    ? _empty()
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _users.length,
+                        itemBuilder: (_, i) => _userCard(_users[i]),
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showForm(),
         icon: const Icon(Icons.person_add),
@@ -205,6 +300,19 @@ class _UsersScreenState extends State<UsersScreen> {
               ),
             ],
           ),
+        ),
+      );
+
+  Widget _empty() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_outline,
+                size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text('No users found',
+                style: TextStyle(color: Colors.grey.shade600)),
+          ],
         ),
       );
 }

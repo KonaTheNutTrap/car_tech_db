@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sort_dropdown.dart';
 
 class VehiclesScreen extends StatefulWidget {
   final int? customerId;
@@ -15,14 +16,41 @@ class VehiclesScreen extends StatefulWidget {
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
   List<Vehicle> _vehicles = [];
+  List<Vehicle> _allVehicles = [];
   List<Customer> _customers = [];
   bool _loading = true;
   final _searchCtrl = TextEditingController();
+  String _sortOption = 'fifo';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  void _sortVehicles() {
+    final list = List<Vehicle>.from(_allVehicles);
+    switch (_sortOption) {
+      case 'fifo':
+        list.sort((a, b) => a.id!.compareTo(b.id!));
+        break;
+      case 'newest':
+        list.sort((a, b) => b.id!.compareTo(a.id!));
+        break;
+      case 'make_asc':
+        list.sort((a, b) => a.make.compareTo(b.make));
+        break;
+      case 'model_asc':
+        list.sort((a, b) => a.model.compareTo(b.model));
+        break;
+      case 'year_desc':
+        list.sort((a, b) => b.year.compareTo(a.year));
+        break;
+      case 'year_asc':
+        list.sort((a, b) => a.year.compareTo(b.year));
+        break;
+    }
+    setState(() => _vehicles = list);
   }
 
   Future<void> _load([String? search]) async {
@@ -32,11 +60,10 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         customerId: widget.customerId, search: search);
     final customers = await db.getCustomers();
     if (!mounted) return;
-    setState(() {
-      _vehicles = vehicles;
-      _customers = customers;
-      _loading = false;
-    });
+    _allVehicles = vehicles;
+    _customers = customers;
+    _sortVehicles();
+    _loading = false;
   }
 
   String _customerName(int id) {
@@ -201,22 +228,44 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         children: [
           if (widget.customerId == null)
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Search by plate, make, or model...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            _load();
-                          })
-                      : null,
-                ),
-                onChanged: (v) => _load(v),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Search by plate, make, or model...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  _load();
+                                })
+                            : null,
+                      ),
+                      onChanged: (v) => _load(v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SortDropdown(
+                    currentValue: _sortOption,
+                    options: const [
+                      SortOption('FIFO (Oldest)', 'fifo'),
+                      SortOption('Newest First', 'newest'),
+                      SortOption('Make (A-Z)', 'make_asc'),
+                      SortOption('Model (A-Z)', 'model_asc'),
+                      SortOption('Year (Newest→Oldest)', 'year_desc'),
+                      SortOption('Year (Oldest→Newest)', 'year_asc'),
+                    ],
+                    onChanged: (v) {
+                      setState(() => _sortOption = v);
+                      _sortVehicles();
+                    },
+                  ),
+                ],
               ),
             ),
           Expanded(

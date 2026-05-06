@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../widgets/sort_dropdown.dart';
 import '../widgets/service_order_print.dart';
 
 class JobsScreen extends StatefulWidget {
@@ -17,10 +18,13 @@ class _JobsScreenState extends State<JobsScreen>
   late TabController _tab;
   final List<String> _statuses = ['All', 'Pending', 'In Progress', 'Completed'];
   List<Job> _jobs = [];
+  List<Job> _allJobs = [];
   List<Customer> _customers = [];
   List<Vehicle> _vehicles = [];
   List<User> _users = [];
   bool _loading = true;
+  final _searchCtrl = TextEditingController();
+  String _sortOption = 'newest';
 
   @override
   void initState() {
@@ -33,10 +37,11 @@ class _JobsScreenState extends State<JobsScreen>
   @override
   void dispose() {
     _tab.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load([String? search]) async {
     setState(() => _loading = true);
     final db = DatabaseHelper.instance;
     final status =
@@ -46,11 +51,56 @@ class _JobsScreenState extends State<JobsScreen>
     final vehicles = await db.getVehicles();
     final users = await db.getUsers();
     if (!mounted) return;
+    _allJobs = jobs;
+    _customers = customers;
+    _vehicles = vehicles;
+    _users = users;
+    _applySearchAndSort();
+    _loading = false;
+  }
+
+  void _applySearchAndSort() {
+    var list = List<Job>.from(_allJobs);
+    final search = _searchCtrl.text.toLowerCase().trim();
+
+    // Apply search filter
+    if (search.isNotEmpty) {
+      list = list.where((j) {
+        final desc = j.description.toLowerCase();
+        final custName = _cName(j.customerId).toLowerCase();
+        final vehName = _vName(j.vehicleId).toLowerCase();
+        final techName = _uName(j.technicianId).toLowerCase();
+        return desc.contains(search) ||
+            custName.contains(search) ||
+            vehName.contains(search) ||
+            techName.contains(search);
+      }).toList();
+    }
+
+    // Apply sort
+    switch (_sortOption) {
+      case 'fifo':
+        list.sort((a, b) => a.id!.compareTo(b.id!));
+        break;
+      case 'newest':
+        list.sort((a, b) => b.id!.compareTo(a.id!));
+        break;
+      case 'status':
+        list.sort((a, b) => a.status.compareTo(b.status));
+        break;
+      case 'cust_asc':
+        list.sort((a, b) => _cName(a.customerId).compareTo(_cName(b.customerId)));
+        break;
+      case 'labor_asc':
+        list.sort((a, b) => a.laborCost.compareTo(b.laborCost));
+        break;
+      case 'labor_desc':
+        list.sort((a, b) => b.laborCost.compareTo(a.laborCost));
+        break;
+    }
+
     setState(() {
-      _jobs = jobs;
-      _customers = customers;
-      _vehicles = vehicles;
-      _users = users;
+      _jobs = list;
       _loading = false;
     });
   }
@@ -209,7 +259,7 @@ class _JobsScreenState extends State<JobsScreen>
     } else {
       await DatabaseHelper.instance.updateJob(job);
     }
-    _load();
+    _load(_searchCtrl.text);
   }
 
   Future<void> _updateStatus(Job job, String newStatus) async {
@@ -268,13 +318,54 @@ class _JobsScreenState extends State<JobsScreen>
               onTap: (_) => _load(),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search by description, customer, or vehicle...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _load();
+                              })
+                          : null,
+                    ),
+                    onChanged: (v) => _load(v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SortDropdown(
+                  currentValue: _sortOption,
+                  options: const [
+                    SortOption('Newest First', 'newest'),
+                    SortOption('FIFO (Oldest)', 'fifo'),
+                    SortOption('Status', 'status'),
+                    SortOption('Customer (A-Z)', 'cust_asc'),
+                    SortOption('Labor (Low→High)', 'labor_asc'),
+                    SortOption('Labor (High→Low)', 'labor_desc'),
+                  ],
+                  onChanged: (v) {
+                    setState(() => _sortOption = v);
+                    _applySearchAndSort();
+                  },
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _jobs.isEmpty
                     ? _empty()
                     : RefreshIndicator(
-                        onRefresh: _load,
+                        onRefresh: () => _load(),
                         child: ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _jobs.length,
