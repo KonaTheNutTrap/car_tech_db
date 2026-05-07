@@ -127,7 +127,7 @@ class ServiceOrderPrint {
                       pw.Padding(
                         padding: pw.EdgeInsets.only(bottom: 2),
                         child: pw.Text(
-                          '• $line',
+                          '- $line',
                           style: pw.TextStyle(fontSize: 11),
                         ),
                       ),
@@ -217,7 +217,7 @@ class ServiceOrderPrint {
                   mainAxisAlignment: pw.MainAxisAlignment.end,
                   children: [
                     pw.Text(
-                      '₱${total.toStringAsFixed(2)}',
+                      'P${total.toStringAsFixed(2)}',
                       style: pw.TextStyle(
                         fontSize: 11,
                         color: PdfColors.grey,
