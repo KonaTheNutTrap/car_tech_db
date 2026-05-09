@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -9,6 +10,10 @@ import '../models/models.dart';
 class ServiceOrderPrint {
   static Future<void> printJob(Job job, BuildContext context) async {
     final db = DatabaseHelper.instance;
+
+    // Load font (Arial) from assets
+    final fontData = await rootBundle.load('assets/fonts/arial.ttf');
+    final ttf = pw.Font.ttf(fontData);
 
     // Get related data
     final customers = await db.getCustomers();
@@ -40,7 +45,9 @@ class ServiceOrderPrint {
     // Build the vehicle display name
     final vehicleDisplay = '${vehicle.make} ${vehicle.model}';
 
-    final doc = pw.Document();
+    final doc = pw.Document(
+      theme: pw.ThemeData.withFont(base: ttf),
+    );
 
     doc.addPage(
       pw.Page(
@@ -127,7 +134,7 @@ class ServiceOrderPrint {
                       pw.Padding(
                         padding: pw.EdgeInsets.only(bottom: 2),
                         child: pw.Text(
-                          '- $line',
+                          ' $line',
                           style: pw.TextStyle(fontSize: 11),
                         ),
                       ),

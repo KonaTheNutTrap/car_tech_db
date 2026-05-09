@@ -127,6 +127,28 @@ class _JobsScreenState extends State<JobsScreen>
     int? techId = existing?.technicianId;
     String status = existing?.status ?? 'Pending';
 
+    // Load all parts from inventory for the materials picker
+    final allParts = await DatabaseHelper.instance.getParts();
+
+    // Load existing job parts if editing
+    List<Map<String, dynamic>> selectedParts = [];
+    if (existing != null) {
+      final existingJobParts = await DatabaseHelper.instance.getJobParts(existing.id!);
+      for (final jp in existingJobParts) {
+        final part = allParts.firstWhere((p) => p.id == jp.partId,
+            orElse: () => Part(
+                name: 'Unknown',
+                quantity: 0,
+                unitPrice: jp.unitPrice,
+                updatedAt: ''));
+        selectedParts.add({
+          'part': part,
+          'quantity': jp.quantity,
+          'unit_price': jp.unitPrice,
+        });
+      }
+    }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => StatefulBuilder(
@@ -134,12 +156,117 @@ class _JobsScreenState extends State<JobsScreen>
           final custVehicles =
               custId != null ? _vehicles.where((v) => v.customerId == custId).toList() : <Vehicle>[];
 
+          // Parts available to add (in stock and not already fully selected)
+          final availableParts = allParts.where((p) {
+            if (p.quantity <= 0) return false;
+            final alreadySelected = selectedParts
+                .where((sp) => (sp['part'] as Part).id == p.id)
+                .fold<int>(0, (sum, sp) => sum + (sp['quantity'] as int));
+            return alreadySelected < p.quantity;
+          }).toList();
+
+          Future<void> addMaterial() async {
+            // Show a sub-dialog to pick a part and quantity
+            Part? selectedPart;
+            final qtyCtrl = TextEditingController(text: '1');
+            final subKey = GlobalKey<FormState>();
+
+            final added = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('Add Material'),
+                content: Form(
+                  key: subKey,
+                  child: SizedBox(
+                    width: 350,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<int>(
+                          isExpanded: true,
+                          decoration:
+                              const InputDecoration(labelText: 'Part *'),
+                          items: availableParts.map((p) {
+                            final alreadyUsed = selectedParts
+                                .where((sp) => (sp['part'] as Part).id == p.id)
+                                .fold<int>(0,
+                                    (sum, sp) => sum + (sp['quantity'] as int));
+                            final remaining = p.quantity - alreadyUsed;
+                            return DropdownMenuItem(
+                              value: p.id,
+                              child: SizedBox(
+                                width: 300,
+                                child: Text(
+                                  '${p.name} (Stock: $remaining) — ₱${p.unitPrice.toStringAsFixed(2)}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            selectedPart = allParts.firstWhere((p) => p.id == v);
+                            setDlg(() {}); // not used for display, just hold state
+                          },
+                          validator: (v) => v == null ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: qtyCtrl,
+                          decoration: const InputDecoration(labelText: 'Quantity *'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v!.isEmpty) return 'Required';
+                            final n = int.tryParse(v);
+                            if (n == null || n < 1) return 'Invalid quantity';
+                            if (selectedPart != null) {
+                              final alreadyUsed = selectedParts
+                                  .where((sp) => (sp['part'] as Part).id == selectedPart!.id)
+                                  .fold<int>(0, (sum, sp) => sum + (sp['quantity'] as int));
+                              if (n > selectedPart!.quantity - alreadyUsed) {
+                                return 'Only ${selectedPart!.quantity - alreadyUsed} available';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel')),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (subKey.currentState!.validate()) {
+                        Navigator.pop(context, true);
+                      }
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            );
+
+            if (added == true && selectedPart != null) {
+              final qty2 = int.tryParse(qtyCtrl.text) ?? 1;
+              setDlg(() {
+                selectedParts.add({
+                  'part': selectedPart,
+                  'quantity': qty2,
+                  'unit_price': selectedPart!.unitPrice,
+                });
+              });
+            }
+          }
+
           return AlertDialog(
             title: Text(existing == null ? 'New Repair Job' : 'Edit Job'),
             content: Form(
               key: formKey,
               child: SizedBox(
-                width: 400,
+                width: 450,
                 child: SingleChildScrollView(
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     DropdownButtonFormField<int>(
@@ -215,6 +342,68 @@ class _JobsScreenState extends State<JobsScreen>
                           const InputDecoration(labelText: 'Notes'),
                       maxLines: 2,
                     ),
+                    const SizedBox(height: 16),
+                    // ── Materials Section ──
+                    const Divider(),
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory, size: 18),
+                        const SizedBox(width: 6),
+                        const Text('Materials',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const Spacer(),
+                        TextButton.icon(
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Add Material'),
+                          onPressed: availableParts.isNotEmpty
+                              ? addMaterial
+                              : null,
+                        ),
+                      ],
+                    ),
+                    if (selectedParts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('No materials added yet',
+                            style: TextStyle(color: Colors.grey)),
+                      )
+                    else
+                      ...selectedParts.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final sp = entry.value;
+                        final part = sp['part'] as Part;
+                        final qty = sp['quantity'] as int;
+                        final price = sp['unit_price'] as double;
+                        final subtotal = qty * price;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${part.name} x$qty',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Text(
+                                '₱${subtotal.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(width: 4),
+                              InkWell(
+                                onTap: () {
+                                  setDlg(() {
+                                    selectedParts.removeAt(i);
+                                  });
+                                },
+                                child: const Icon(Icons.remove_circle_outline,
+                                    size: 16, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                   ]),
                 ),
               ),
@@ -254,10 +443,47 @@ class _JobsScreenState extends State<JobsScreen>
       updatedAt: now,
     );
 
+    final db = DatabaseHelper.instance;
+
     if (existing == null) {
-      await DatabaseHelper.instance.insertJob(job);
+      // New job: insert job, then add job_parts and deduct stock
+      final jobId = await db.insertJob(job);
+      for (final sp in selectedParts) {
+        final part = sp['part'] as Part;
+        final qty = sp['quantity'] as int;
+        final price = sp['unit_price'] as double;
+        await db.insertJobPart(JobPart(
+          jobId: jobId,
+          partId: part.id!,
+          quantity: qty,
+          unitPrice: price,
+        ));
+        await db.deductPartStock(part.id!, qty);
+      }
     } else {
-      await DatabaseHelper.instance.updateJob(job);
+      // Editing existing job:
+      // 1. Restore stock for old job_parts
+      final oldParts = await db.getJobParts(existing.id!);
+      for (final oldJp in oldParts) {
+        await db.restorePartStock(oldJp.partId, oldJp.quantity);
+      }
+      // 2. Delete old job_parts
+      await db.deleteJobPartsByJob(existing.id!);
+      // 3. Update the job
+      await db.updateJob(job);
+      // 4. Insert new job_parts and deduct stock
+      for (final sp in selectedParts) {
+        final part = sp['part'] as Part;
+        final qty = sp['quantity'] as int;
+        final price = sp['unit_price'] as double;
+        await db.insertJobPart(JobPart(
+          jobId: existing.id!,
+          partId: part.id!,
+          quantity: qty,
+          unitPrice: price,
+        ));
+        await db.deductPartStock(part.id!, qty);
+      }
     }
     _load(_searchCtrl.text);
   }

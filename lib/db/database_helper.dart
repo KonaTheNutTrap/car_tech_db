@@ -457,6 +457,33 @@ class DatabaseHelper {
     return await db.delete('job_parts', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Delete all job_parts for a given job (used when editing a job's materials)
+  Future<void> deleteJobPartsByJob(int jobId) async {
+    final db = await database;
+    await db.delete('job_parts', where: 'job_id = ?', whereArgs: [jobId]);
+  }
+
+  /// Deduct stock from a part. Throws if insufficient stock.
+  Future<void> deductPartStock(int partId, int quantity) async {
+    final db = await database;
+    final result = await db.rawUpdate('''
+      UPDATE parts SET quantity = quantity - ?
+      WHERE id = ? AND quantity >= ?
+    ''', [quantity, partId, quantity]);
+    if (result == 0) {
+      throw Exception('Insufficient stock for part ID $partId');
+    }
+  }
+
+  /// Restore stock to a part (undo deduction).
+  Future<void> restorePartStock(int partId, int quantity) async {
+    final db = await database;
+    await db.rawUpdate('''
+      UPDATE parts SET quantity = quantity + ?
+      WHERE id = ?
+    ''', [quantity, partId]);
+  }
+
   // ── INVOICES ───────────────────────────────────
   Future<List<Invoice>> getInvoices() async {
     final db = await database;
