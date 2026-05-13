@@ -25,6 +25,7 @@ class _JobsScreenState extends State<JobsScreen>
   bool _loading = true;
   final _searchCtrl = TextEditingController();
   String _sortOption = 'newest';
+  Map<int, List<Map<String, dynamic>>> _jobPartsMap = {};
 
   @override
   void initState() {
@@ -55,6 +56,16 @@ class _JobsScreenState extends State<JobsScreen>
     _customers = customers;
     _vehicles = vehicles;
     _users = users;
+
+    // Load materials for each job
+    _jobPartsMap = {};
+    for (final job in jobs) {
+      if (job.id != null) {
+        final parts = await db.getJobPartsWithNames(job.id!);
+        _jobPartsMap[job.id!] = parts;
+      }
+    }
+
     _applySearchAndSort();
     _loading = false;
   }
@@ -635,6 +646,90 @@ class _JobsScreenState extends State<JobsScreen>
               _infoRow(Icons.payments, 'Labor: ₱${job.laborCost.toStringAsFixed(2)}'),
               if (job.notes != null)
                 _infoRow(Icons.note, job.notes!),
+              // ── Materials ──
+              if (job.id != null && _jobPartsMap.containsKey(job.id)) ...[
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.inventory, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 6),
+                    Text('Materials',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ...() {
+                  final parts = _jobPartsMap[job.id!]!;
+                  double totalMaterials = 0;
+                  final widgets = <Widget>[];
+                  for (final part in parts) {
+                    final name = part['name'] as String;
+                    final qty = part['quantity'] as int;
+                    final price = (part['unit_price'] as num).toDouble();
+                    final subtotal = qty * price;
+                    totalMaterials += subtotal;
+                    widgets.add(
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20, top: 2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$name x$qty',
+                                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                              ),
+                            ),
+                            Text(
+                              '₱${subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 12, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  if (parts.isNotEmpty) {
+                    widgets.add(
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20, top: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text('Materials Total',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade800)),
+                            ),
+                            Text(
+                              '₱${totalMaterials.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  if (parts.isEmpty) {
+                    widgets.add(
+                      const Padding(
+                        padding: EdgeInsets.only(left: 20, top: 2),
+                        child: Text('No materials',
+                            style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ),
+                    );
+                  }
+                  return widgets;
+                }(),
+              ],
               const Divider(height: 16),
               Row(
                 children: [
