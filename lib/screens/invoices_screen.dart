@@ -360,11 +360,72 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       icon: const Icon(Icons.payments, size: 16),
                       label: const Text('Pay'),
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.success,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8)),
+                        backgroundColor: AppTheme.success,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
                       onPressed: () => _recordPayment(inv),
                     ),
+
+                  const SizedBox(width: 8),
+
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
+
+                    onPressed: () async {
+
+                      final confirm = await showDialog<bool>(
+                        context: context,
+
+                        builder: (_) => AlertDialog(
+                          title: const Text('Delete Invoice'),
+
+                          content: const Text(
+                            'Are you sure you want to delete this invoice?',
+                          ),
+
+                          actions: [
+
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+
+                        await DatabaseHelper.instance.deleteInvoice(inv.id!);
+
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Invoice deleted successfully'),
+                          ),
+                        );
+
+                        _load();
+                      }
+                    },
+                  ),
                 ],
               ),
             ],

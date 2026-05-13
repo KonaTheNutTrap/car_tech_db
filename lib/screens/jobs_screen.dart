@@ -671,10 +671,65 @@ class _JobsScreenState extends State<JobsScreen>
                       style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
                       onPressed: () => ServiceOrderPrint.printJob(job, context),
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 18),
-                    onPressed: () => _showJobForm(job),
+                    IconButton(
+                  icon: const Icon(Icons.edit, size: 18),
+                  onPressed: () => _showJobForm(job),
+                ),
+
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete,
+                    size: 18,
+                    color: Colors.red,
                   ),
+
+                  onPressed: () async {
+
+                    final confirm = await showDialog<bool>(
+                      context: context,
+
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Job'),
+
+                        content: const Text(
+                          'Are you sure you want to delete this job?',
+                        ),
+
+                        actions: [
+
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+
+                      await DatabaseHelper.instance.deleteJob(job.id!);
+
+                      if (!mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Job deleted successfully'),
+                        ),
+                      );
+
+                      _load();
+                    }
+                  },
+                ),
                 ],
               ),
             ],
