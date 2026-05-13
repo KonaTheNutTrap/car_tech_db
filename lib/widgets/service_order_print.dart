@@ -70,12 +70,12 @@ class ServiceOrderPrint {
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Jumbo Bridge, Punta Tabuc, Roxas City',
-                      style: pw.TextStyle(fontSize: 11),
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Contact No.: 0918-991-8617 / 0917-145-7867',
-                      style: pw.TextStyle(fontSize: 11),
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
                   ],
                 ),
@@ -126,16 +126,16 @@ class ServiceOrderPrint {
               ),
               pw.SizedBox(height: 4),
               pw.Padding(
-                padding: pw.EdgeInsets.only(left: 20),
+                padding: const pw.EdgeInsets.only(left: 20),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     for (final line in job.description.split('\n'))
                       pw.Padding(
-                        padding: pw.EdgeInsets.only(bottom: 2),
+                        padding: const pw.EdgeInsets.only(bottom: 2),
                         child: pw.Text(
                           ' $line',
-                          style: pw.TextStyle(fontSize: 11),
+                          style: const pw.TextStyle(fontSize: 11),
                         ),
                       ),
                   ],
@@ -167,22 +167,22 @@ class ServiceOrderPrint {
               ),
               pw.SizedBox(height: 4),
               pw.Padding(
-                padding: pw.EdgeInsets.only(left: 20),
+                padding: const pw.EdgeInsets.only(left: 20),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     for (final part in jobParts)
                       pw.Padding(
-                        padding: pw.EdgeInsets.only(bottom: 2),
+                        padding: const pw.EdgeInsets.only(bottom: 2),
                         child: pw.Text(
                           '${part['name']}: ${_fmt((part['quantity'] as int) * (part['unit_price'] as num).toDouble())}',
-                          style: pw.TextStyle(fontSize: 11),
+                          style: const pw.TextStyle(fontSize: 11),
                         ),
                       ),
                     if (jobParts.isEmpty)
                       pw.Text(
                         'No materials',
-                        style: pw.TextStyle(fontSize: 11),
+                        style: const pw.TextStyle(fontSize: 11),
                       ),
                   ],
                 ),
@@ -225,7 +225,7 @@ class ServiceOrderPrint {
                   children: [
                     pw.Text(
                       'P${total.toStringAsFixed(2)}',
-                      style: pw.TextStyle(
+                      style: const pw.TextStyle(
                         fontSize: 11,
                         color: PdfColors.grey,
                       ),
@@ -254,7 +254,7 @@ class ServiceOrderPrint {
                   children: [
                     pw.Text(
                       technician.fullName,
-                      style: pw.TextStyle(
+                      style: const pw.TextStyle(
                         fontSize: 11,
                         color: PdfColors.grey700,
                       ),
@@ -274,7 +274,7 @@ class ServiceOrderPrint {
 
   static pw.Widget _infoLine(String label, String value) {
     return pw.Padding(
-      padding: pw.EdgeInsets.symmetric(vertical: 2),
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
         children: [
           pw.SizedBox(
@@ -289,7 +289,7 @@ class ServiceOrderPrint {
           ),
           pw.Text(
             value,
-            style: pw.TextStyle(fontSize: 11),
+            style: const pw.TextStyle(fontSize: 11),
           ),
         ],
       ),
