@@ -426,6 +426,49 @@ class DatabaseHelper {
     return await db.update('jobs', j.toMap(),
         where: 'id = ?', whereArgs: [j.id]);
   }
+  Future<int> deleteJob(int jobId) async {
+  final db = await instance.database;
+
+  return await db.transaction((txn) async {
+
+    // Get invoices related to this job
+    final invoices = await txn.query(
+      'invoices',
+      where: 'job_id = ?',
+      whereArgs: [jobId],
+    );
+
+    // Delete payments linked to invoices
+    for (var invoice in invoices) {
+      await txn.delete(
+        'payments',
+        where: 'invoice_id = ?',
+        whereArgs: [invoice['id']],
+      );
+    }
+
+    // Delete invoices
+    await txn.delete(
+      'invoices',
+      where: 'job_id = ?',
+      whereArgs: [jobId],
+    );
+
+    // Delete job parts
+    await txn.delete(
+      'job_parts',
+      where: 'job_id = ?',
+      whereArgs: [jobId],
+    );
+
+    // Delete job
+    return await txn.delete(
+      'jobs',
+      where: 'id = ?',
+      whereArgs: [jobId],
+    );
+  });
+  }
 
   // ── JOB PARTS ──────────────────────────────────
   Future<List<JobPart>> getJobParts(int jobId) async {
@@ -508,6 +551,27 @@ class DatabaseHelper {
     final db = await database;
     return await db.update('invoices', inv.toMap(),
         where: 'id = ?', whereArgs: [inv.id]);
+  }
+
+  Future<int> deleteInvoice(int invoiceId) async {
+  final db = await instance.database;
+
+  return await db.transaction((txn) async {
+
+    // Delete related payments
+    await txn.delete(
+      'payments',
+      where: 'invoice_id = ?',
+      whereArgs: [invoiceId],
+    );
+
+    // Delete invoice
+    return await txn.delete(
+      'invoices',
+      where: 'id = ?',
+      whereArgs: [invoiceId],
+    );
+  });
   }
 
   // ── PAYMENTS ───────────────────────────────────
