@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/sort_dropdown.dart';
 
@@ -283,7 +285,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         ),
       );
 
-  Widget _invoiceCard(Invoice inv) => Card(
+  Widget _invoiceCard(Invoice inv) {
+    final auth = context.watch<AuthProvider>();
+    return Card(
         margin: const EdgeInsets.only(bottom: 8),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -371,67 +375,57 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
                   const SizedBox(width: 8),
 
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.red,
-                    ),
-
-                    onPressed: () async {
-
-                      final confirm = await showDialog<bool>(
-                        context: context,
-
-                        builder: (_) => AlertDialog(
-                          title: const Text('Delete Invoice'),
-
-                          content: const Text(
-                            'Are you sure you want to delete this invoice?',
-                          ),
-
-                          actions: [
-
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
+                  // Delete button - admin only
+                  if (auth.isAdmin)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                      ),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Delete Invoice'),
+                            content: const Text(
+                              'Are you sure you want to delete this invoice?',
                             ),
-
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
                               ),
-
-                              child: const Text('Delete'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true) {
-
-                        await DatabaseHelper.instance.deleteInvoice(inv.id!);
-
-                        if (!mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Invoice deleted successfully'),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
                           ),
                         );
 
-                        _load();
-                      }
-                    },
-                  ),
+                        if (confirm == true) {
+                          await DatabaseHelper.instance.deleteInvoice(inv.id!);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Invoice deleted successfully'),
+                            ),
+                          );
+                          _load();
+                        }
+                      },
+                    ),
                 ],
               ),
             ],
           ),
         ),
       );
+    }
 
   Widget _empty() => Center(
         child: Column(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../db/database_helper.dart';
 import '../models/models.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/sort_dropdown.dart';
 import '../widgets/service_order_print.dart';
@@ -622,216 +624,205 @@ class _JobsScreenState extends State<JobsScreen>
     );
   }
 
-  Widget _jobCard(Job job) => Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+  Widget _jobCard(Job job) {
+    final auth = context.watch<AuthProvider>();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(job.description,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 15)),
+                ),
+                _statusChip(job.status),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _infoRow(Icons.person, _cName(job.customerId)),
+            _infoRow(Icons.directions_car, _vName(job.vehicleId)),
+            _infoRow(Icons.build, 'Technician: ${_uName(job.technicianId)}'),
+            _infoRow(Icons.payments, 'Labor: ₱${job.laborCost.toStringAsFixed(2)}'),
+            if (job.notes != null)
+              _infoRow(Icons.note, job.notes!),
+            // ── Materials ──
+            if (job.id != null && _jobPartsMap.containsKey(job.id)) ...[
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: Text(job.description,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15)),
-                  ),
-                  _statusChip(job.status),
+                  Icon(Icons.inventory, size: 14, color: Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text('Materials',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700)),
                 ],
               ),
-              const SizedBox(height: 8),
-              _infoRow(Icons.person, _cName(job.customerId)),
-              _infoRow(Icons.directions_car, _vName(job.vehicleId)),
-              _infoRow(Icons.build, 'Technician: ${_uName(job.technicianId)}'),
-              _infoRow(Icons.payments, 'Labor: ₱${job.laborCost.toStringAsFixed(2)}'),
-              if (job.notes != null)
-                _infoRow(Icons.note, job.notes!),
-              // ── Materials ──
-              if (job.id != null && _jobPartsMap.containsKey(job.id)) ...[
-                const SizedBox(height: 8),
-                const Divider(height: 1),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.inventory, size: 14, color: Colors.grey.shade600),
-                    const SizedBox(width: 6),
-                    Text('Materials',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ...() {
-                  final parts = _jobPartsMap[job.id!]!;
-                  double totalMaterials = 0;
-                  final widgets = <Widget>[];
-                  for (final part in parts) {
-                    final name = part['name'] as String;
-                    final qty = part['quantity'] as int;
-                    final price = (part['unit_price'] as num).toDouble();
-                    final subtotal = qty * price;
-                    totalMaterials += subtotal;
-                    widgets.add(
-                      Padding(
-                        padding: const EdgeInsets.only(left: 20, top: 2),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '$name x$qty',
-                                style: const TextStyle(fontSize: 12, color: Colors.black87),
-                              ),
-                            ),
-                            Text(
-                              '₱${subtotal.toStringAsFixed(2)}',
+              const SizedBox(height: 4),
+              ...() {
+                final parts = _jobPartsMap[job.id!]!;
+                double totalMaterials = 0;
+                final widgets = <Widget>[];
+                for (final part in parts) {
+                  final name = part['name'] as String;
+                  final qty = part['quantity'] as int;
+                  final price = (part['unit_price'] as num).toDouble();
+                  final subtotal = qty * price;
+                  totalMaterials += subtotal;
+                  widgets.add(
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, top: 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$name x$qty',
                               style: const TextStyle(fontSize: 12, color: Colors.black87),
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  if (parts.isNotEmpty) {
-                    widgets.add(
-                      Padding(
-                        padding: const EdgeInsets.only(left: 20, top: 4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text('Materials Total',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade800)),
-                            ),
-                            Text(
-                              '₱${totalMaterials.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade800),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  if (parts.isEmpty) {
-                    widgets.add(
-                      const Padding(
-                        padding: EdgeInsets.only(left: 20, top: 2),
-                        child: Text('No materials',
-                            style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ),
-                    );
-                  }
-                  return widgets;
-                }(),
-              ],
-              const Divider(height: 16),
-              Row(
-                children: [
-                  Text(
-                    DateFormat('MMM d, yyyy').format(
-                        DateTime.parse(job.createdAt)),
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  ),
-                  const Spacer(),
-                  if (job.status != 'In Progress' && job.status != 'Completed')
-                    TextButton.icon(
-                      icon: const Icon(Icons.play_arrow, size: 16),
-                      label: const Text('Start'),
-                      onPressed: () => _updateStatus(job, 'In Progress'),
-                    ),
-                  if (job.status == 'In Progress')
-                    TextButton.icon(
-                      icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Complete'),
-                      style: TextButton.styleFrom(foregroundColor: AppTheme.success),
-                      onPressed: () => _updateStatus(job, 'Completed'),
-                    ),
-                  if (job.status == 'Completed')
-                    TextButton.icon(
-                      icon: const Icon(Icons.receipt, size: 16),
-                      label: const Text('Invoice'),
-                      style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
-                      onPressed: () => _generateInvoice(job),
-                    ),
-                  if (job.status == 'Completed')
-                    TextButton.icon(
-                      icon: const Icon(Icons.print, size: 16),
-                      label: const Text('Print'),
-                      style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-                      onPressed: () => ServiceOrderPrint.printJob(job, context),
-                    ),
-                    IconButton(
-                  icon: const Icon(Icons.edit, size: 18),
-                  onPressed: () => _showJobForm(job),
-                ),
-
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete,
-                    size: 18,
-                    color: Colors.red,
-                  ),
-
-                  onPressed: () async {
-
-                    final confirm = await showDialog<bool>(
-                      context: context,
-
-                      builder: (_) => AlertDialog(
-                        title: const Text('Delete Job'),
-
-                        content: const Text(
-                          'Are you sure you want to delete this job?',
-                        ),
-
-                        actions: [
-
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
                           ),
-
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Delete'),
+                          Text(
+                            '₱${subtotal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.black87),
                           ),
                         ],
                       ),
-                    );
-
-                    if (confirm == true) {
-
-                      await DatabaseHelper.instance.deleteJob(job.id!);
-
-                      if (!mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Job deleted successfully'),
+                    ),
+                  );
+                }
+                if (parts.isNotEmpty) {
+                  widgets.add(
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, top: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('Materials Total',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade800)),
+                          ),
+                          Text(
+                            '₱${totalMaterials.toStringAsFixed(2)}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade800),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                if (parts.isEmpty) {
+                  widgets.add(
+                    const Padding(
+                      padding: const EdgeInsets.only(left: 20, top: 2),
+                      child: Text('No materials',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ),
+                  );
+                }
+                return widgets;
+              }(),
+            ],
+            const Divider(height: 16),
+            Row(
+              children: [
+                Text(
+                  DateFormat('MMM d, yyyy').format(
+                      DateTime.parse(job.createdAt)),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+                const Spacer(),
+                if (job.status != 'In Progress' && job.status != 'Completed')
+                  TextButton.icon(
+                    icon: const Icon(Icons.play_arrow, size: 16),
+                    label: const Text('Start'),
+                    onPressed: () => _updateStatus(job, 'In Progress'),
+                  ),
+                if (job.status == 'In Progress')
+                  TextButton.icon(
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Complete'),
+                    style: TextButton.styleFrom(foregroundColor: AppTheme.success),
+                    onPressed: () => _updateStatus(job, 'Completed'),
+                  ),
+                if (job.status == 'Completed')
+                  TextButton.icon(
+                    icon: const Icon(Icons.receipt, size: 16),
+                    label: const Text('Invoice'),
+                    style: TextButton.styleFrom(foregroundColor: AppTheme.accent),
+                    onPressed: () => _generateInvoice(job),
+                  ),
+                if (job.status == 'Completed')
+                  TextButton.icon(
+                    icon: const Icon(Icons.print, size: 16),
+                    label: const Text('Print'),
+                    style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+                    onPressed: () => ServiceOrderPrint.printJob(job, context),
+                  ),
+                // Edit button - admin only
+                if (auth.isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    onPressed: () => _showJobForm(job),
+                  ),
+                // Delete button - admin only
+                if (auth.isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Delete Job'),
+                          content: const Text(
+                            'Are you sure you want to delete this job?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
                         ),
                       );
-
-                      _load();
-                    }
-                  },
-                ),
-                ],
-              ),
-            ],
-          ),
+                      if (confirm == true) {
+                        await DatabaseHelper.instance.deleteJob(job.id!);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Job deleted successfully'),
+                          ),
+                        );
+                        _load();
+                      }
+                    },
+                  ),
+              ],
+            ),
+          ],
         ),
-      );
-
+      ),
+    );
+  }
   Widget _infoRow(IconData icon, String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
