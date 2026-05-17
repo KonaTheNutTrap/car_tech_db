@@ -160,9 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold)),
                               SizedBox(height: 4),
-                              Text('admin / admin123 (Admin)'),
-                              Text('tech1 / tech123 (Technician)'),
-                              Text('recep1 / recep123 (Receptionist)'),
+                              Text('admin (Admin)'),
+                              Text('tech1 (Technician)'),
+                              Text('recep1 (Receptionist)'),
+                              SizedBox(height: 4),
+                              Text('Ask your administrator for the password.',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey)),
                             ],
                           ),
                         ),

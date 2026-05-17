@@ -1,3 +1,4 @@
+import 'package:bcrypt/bcrypt.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import '../models/models.dart';
@@ -17,7 +18,40 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
+  }
+
+  /// Hash a plain-text password using bcrypt.
+  static String hashPassword(String plain) {
+    return BCrypt.hashpw(plain, BCrypt.gensalt());
+  }
+
+  /// Check if a string looks like a bcrypt hash (starts with $2a$, $2b$, or $2y$).
+  static bool _isBcryptHash(String password) {
+    return password.startsWith(r'$2a$') ||
+        password.startsWith(r'$2b$') ||
+        password.startsWith(r'$2y$');
+  }
+
+  /// Migrate from older versions.
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // Upgrade from version 1 to 2: hash any plain-text passwords
+    if (oldVersion < 2) {
+      final users = await db.query('users');
+      for (final u in users) {
+        final password = u['password'] as String;
+        // If it's not already a bcrypt hash, hash it
+        if (!_isBcryptHash(password)) {
+          final hashed = hashPassword(password);
+          await db.update(
+            'users',
+            {'password': hashed},
+            where: 'id = ?',
+            whereArgs: [u['id']],
+          );
+        }
+      }
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -130,10 +164,10 @@ class DatabaseHelper {
       )
     ''');
 
-    // Seed admin user
+    // Seed admin user (password hashed)
     await db.insert('users', {
       'username': 'admin',
-      'password': 'admin123',
+      'password': hashPassword('admin123'),
       'role': 'Admin',
       'full_name': 'System Administrator',
       'created_at': DateTime.now().toIso8601String(),
@@ -147,7 +181,7 @@ class DatabaseHelper {
     // Technician
     await db.insert('users', {
       'username': 'tech1',
-      'password': 'tech123',
+      'password': hashPassword('tech123'),
       'role': 'Technician',
       'full_name': 'Juan dela Cruz',
       'created_at': DateTime.now().toIso8601String(),
@@ -155,7 +189,7 @@ class DatabaseHelper {
     // Receptionist
     await db.insert('users', {
       'username': 'recep1',
-      'password': 'recep123',
+      'password': hashPassword('recep123'),
       'role': 'Receptionist',
       'full_name': 'Maria Santos',
       'created_at': DateTime.now().toIso8601String(),
@@ -273,11 +307,15 @@ class DatabaseHelper {
   // ── USERS ──────────────────────────────────────
   Future<User?> login(String username, String password) async {
     final db = await database;
+    // Query user by username only
     final result = await db.query('users',
-        where: 'username = ? AND password = ?',
-        whereArgs: [username, password]);
+        where: 'username = ?',
+        whereArgs: [username]);
     if (result.isEmpty) return null;
-    return User.fromMap(result.first);
+    final user = User.fromMap(result.first);
+    // Verify password against bcrypt hash
+    if (!BCrypt.checkpw(password, user.password)) return null;
+    return user;
   }
 
   Future<List<User>> getUsers() async {
@@ -288,12 +326,22 @@ class DatabaseHelper {
 
   Future<int> insertUser(User user) async {
     final db = await database;
-    return await db.insert('users', user.toMap());
+    // Always hash the password before storing
+    final hashedUser = user.copyWith(password: hashPassword(user.password));
+    return await db.insert('users', hashedUser.toMap());
   }
 
   Future<int> updateUser(User user) async {
     final db = await database;
-    return await db.update('users', user.toMap(),
+    User userToSave;
+    // If the password is already a bcrypt hash, store as-is (user didn't change it)
+    if (_isBcryptHash(user.password)) {
+      userToSave = user;
+    } else {
+      // New plain-text password, hash it
+      userToSave = user.copyWith(password: hashPassword(user.password));
+    }
+    return await db.update('users', userToSave.toMap(),
         where: 'id = ?', whereArgs: [user.id]);
   }
 

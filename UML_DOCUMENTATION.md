@@ -555,6 +555,192 @@ This diagram models the **lifecycle of a Repair Job** within the system, showing
 
 This diagram is crucial for understanding the **business workflow** of the system, ensuring that jobs move through clearly defined stages with appropriate validation at each step.
 
+
+---
+
+## ACTIVITY DIAGRAM
+
+### Use Case: Complete Workshop Management Workflow
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName Arial
+
+|Receptionist/Admin|
+|Technician|
+|System|
+
+|Receptionist/Admin|
+start
+:Customer arrives;
+:Check if customer exists;
+if (Customer exists?) then (No)
+  :Register new customer;
+  :Record contact details;
+endif
+
+|Receptionist/Admin|
+:Register vehicle;
+:Select customer;
+:Enter vehicle details;
+:Save vehicle record;
+
+|System|
+:Validate and store
+vehicle data;
+
+|Receptionist/Admin|
+:Create new repair job;
+:Select vehicle;
+:Enter job description;
+:Assign technician;
+if (Parts needed for job?) then (Yes)
+  :Select required parts from inventory;
+else (No)
+endif
+
+|System|
+:Validate job data;
+:Save job record;
+:Update job status to
+"Pending";
+
+|Technician|
+:View assigned jobs;
+:Select job to work on;
+:Begin working on job;
+
+|System|
+:Update job status to
+"In Progress";
+
+|Technician|
+while (Work in progress?) is (Yes)
+  :Perform repair work;
+  if (Parts needed?) then (Yes)
+    :Check parts stock level;
+    if (Parts in stock?) then (Yes)
+      :Use parts from inventory;
+    else (No)
+      :Notify parts shortage;
+      :Set job awaiting parts;
+      :Wait for parts restock;
+
+|Receptionist/Admin|
+      :Order / restock parts;
+
+|System|
+      :Update parts quantity;
+
+|Technician|
+      :Resume work;
+    endif
+  else (No)
+  endif
+  :Record labor details;
+endwhile (No)
+
+|System|
+:Deduct used parts from
+inventory;
+:Calculate job totals
+(labor + parts);
+
+|Technician|
+:Mark job as completed;
+
+|System|
+:Update job status to
+"Completed";
+
+|Receptionist/Admin|
+:Open completed job;
+:Generate invoice;
+
+|System|
+:Calculate total amount;
+:Create invoice record;
+:Assign invoice number;
+
+|Receptionist/Admin|
+:Present invoice to customer;
+:Process payment;
+if (Cash payment?) then (Yes)
+  :Receive cash payment;
+else (No)
+  if (GCash payment?) then (Yes)
+    :Process GCash transfer;
+  else (No)
+    if (Card payment?) then (Yes)
+      :Process card payment;
+    else (No)
+      :Process bank transfer;
+    endif
+  endif
+endif
+
+|System|
+:Record payment transaction;
+:Update invoice payment status;
+if (Full amount paid?) then (Yes)
+  :Mark invoice as "Paid";
+else (No)
+  :Mark invoice as "Partial";
+endif
+
+|Receptionist/Admin|
+:Provide receipt to customer;
+
+stop
+
+@enduml
+```
+
+### Activity Diagram Explanation:
+
+This diagram models the **complete end-to-end workflow** of the Car Technician Database System, from customer arrival to payment receipt. It uses **swimlanes (partitions)** to show which role (Receptionist/Admin, Technician, or System) is responsible for each activity.
+
+**Key UML Activity Diagram Elements Used:**
+
+1. **Swimlanes / Partitions**: The diagram is divided into three vertical sections, each representing a different actor:
+   - **Receptionist/Admin** — Handles customer-facing activities, vehicle registration, job creation, invoicing, and payment processing.
+   - **Technician** — Performs the actual repair work, uses parts, and records labor details.
+   - **System** — Performs automated database operations, validations, stock calculations, and record-keeping.
+
+2. **Initial Node (Start)**: The filled circle at the top marks the starting point — customer arrival.
+
+3. **Activity Nodes (Rectangles)**: Represent individual actions or steps in the workflow. Examples include "Register new customer", "Use parts from inventory", "Generate invoice".
+
+4. **Decision Nodes (Diamonds)**: Represent branching points where the flow splits based on a condition:
+   - *Customer exists?* — New vs returning customer
+   - *Parts needed for job?* — Job requiring parts vs labor-only
+   - *Parts in stock?* — Available vs out-of-stock parts
+   - *Payment method?* — Cash, GCash, Card, or Bank Transfer
+   - *Full amount paid?* — Paid vs Partial payment status
+
+5. **Merge Nodes**: Points where alternative flows rejoin (e.g., after customer registration check, after payment processing).
+
+6. **Loop Node (While)**: The "Work in progress?" loop represents the iterative nature of repair work, where the technician may need multiple rounds of parts usage and labor recording until the job is complete.
+
+7. **Fork (Implied Parallel Activities)**: When a job is paused for parts restocking, both the Technician (waiting) and Receptionist/Admin (ordering parts) activities can proceed in parallel.
+
+8. **Final Node (Stop)**: The bullseye symbol marks the end of the workflow — customer receives a receipt after payment.
+
+**Workflow Phases:**
+
+1. **Customer Intake (Steps 1-3)**: Check if the customer exists in the system. If not, register them along with their contact details. Then register their vehicle.
+
+2. **Job Creation (Steps 4-6)**: Create a repair job, select the vehicle, enter a description, assign a technician, and optionally select parts needed from inventory.
+
+3. **Job Execution (Steps 7-22)**: The technician works on the job. If parts are needed, the system checks stock levels. If out of stock, the job enters "Awaiting Parts" state until restocked. The technician records labor details, and the loop continues until all work is complete.
+
+4. **Job Completion (Steps 23-25)**: The technician marks the job as completed, the system deducts used parts from inventory, calculates totals, and updates the job status.
+
+5. **Invoicing (Steps 26-29)**: The receptionist/admin generates an invoice from the completed job. The system calculates the total (labor + parts) and creates the invoice record.
+
+6. **Payment Processing (Steps 30-40)**: The customer pays via one of four methods (Cash, GCash, Card, Bank Transfer). The system records the payment and updates the invoice status to either "Paid" or "Partial" based on whether the full amount was covered.
+
 ---
 
 ## SUBMISSION REQUIREMENTS CHECKLIST
@@ -570,6 +756,10 @@ This diagram is crucial for understanding the **business workflow** of the syste
 | Sequence Diagram - Step-by-step interaction |  9 phases, ~25 message steps |
 | State Machine Diagram - Job lifecycle |  5 states, 7 transitions with guards |
 | State Machine Diagram - Guards and events |  Guard conditions on critical transitions |
+| Activity Diagram - Complete workflow process |  Full workshop workflow (swimlanes, decisions, loops) |
+| Activity Diagram - Swimlanes/partitions |  3 swimlanes (Receptionist/Admin, Technician, System) |
+| Activity Diagram - Decision and merge nodes |  5 decision points, multiple merge nodes |
+| Activity Diagram - Loop/iteration |  Work-in-progress loop for multi-step repairs |
 | Layered Architecture Diagram |  5-tier component diagram |
 | Deployment Architecture Diagram | Client-node with optional cloud sync |
 | Architectural genre identified | Layered Architecture + MVVM |

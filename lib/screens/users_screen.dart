@@ -80,7 +80,7 @@ class _UsersScreenState extends State<UsersScreen> {
   Future<void> _showForm([User? existing]) async {
     final nameCtrl = TextEditingController(text: existing?.fullName);
     final userCtrl = TextEditingController(text: existing?.username);
-    final passCtrl = TextEditingController(text: existing?.password);
+    final passCtrl = TextEditingController(text: existing == null ? '' : '');
     String role = existing?.role ?? 'Technician';
     final formKey = GlobalKey<FormState>();
     bool obscure = true;
@@ -106,11 +106,11 @@ class _UsersScreenState extends State<UsersScreen> {
                   validator: (v) => v!.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
+                  TextFormField(
                   controller: passCtrl,
                   obscureText: obscure,
                   decoration: InputDecoration(
-                    labelText: 'Password *',
+                    labelText: existing == null ? 'Password *' : 'New Password (leave blank to keep)',
                     suffixIcon: IconButton(
                       icon: Icon(
                           obscure ? Icons.visibility_off : Icons.visibility),
@@ -118,7 +118,10 @@ class _UsersScreenState extends State<UsersScreen> {
                           setDlg(() => obscure = !obscure),
                     ),
                   ),
-                  validator: (v) => v!.isEmpty ? 'Required' : null,
+                  validator: (v) =>
+                      existing == null
+                          ? (v!.isEmpty ? 'Required' : null)
+                          : null,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -164,7 +167,11 @@ class _UsersScreenState extends State<UsersScreen> {
     if (existing == null) {
       await DatabaseHelper.instance.insertUser(user);
     } else {
-      await DatabaseHelper.instance.updateUser(user);
+      // If the password field was left blank when editing, pass the existing (hashed) password
+      final userToUpdate = passCtrl.text.isEmpty
+          ? user.copyWith(password: existing.password)
+          : user;
+      await DatabaseHelper.instance.updateUser(userToUpdate);
     }
     _load();
   }
